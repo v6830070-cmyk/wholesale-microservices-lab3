@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 from typing import Optional
 from sqlmodel import SQLModel, Field
@@ -6,26 +5,26 @@ from sqlmodel import SQLModel, Field
 
 class Unit(SQLModel, table=True):
     __tablename__ = "units"
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
     code: str = Field(unique=True, max_length=10)
     name: str = Field(max_length=50)
 
 
 class Category(SQLModel, table=True):
     __tablename__ = "categories"
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    parent_id: Optional[uuid.UUID] = Field(default=None, foreign_key="categories.id")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    parent_id: Optional[int] = Field(default=None, foreign_key="categories.id")
     name: str = Field(max_length=150)
     slug: str = Field(unique=True, max_length=150)
 
 
 class Product(SQLModel, table=True):
     __tablename__ = "products"
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
     sku: str = Field(unique=True, index=True, max_length=64)
     name: str = Field(max_length=255)
-    category_id: uuid.UUID = Field(foreign_key="categories.id")
-    unit_id: uuid.UUID = Field(foreign_key="units.id")
+    category_id: int = Field(foreign_key="categories.id")
+    unit_id: int = Field(foreign_key="units.id")
     description: Optional[str] = None
     weight_kg: float = 0
     cost_price: float = 0

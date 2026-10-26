@@ -1,4 +1,3 @@
-import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
@@ -11,17 +10,18 @@ product_router = APIRouter(tags=["Products"])
 @product_router.post("/new", status_code=status.HTTP_201_CREATED)
 async def create_product(new_product: Product,
                          session: Session = Depends(get_session)) -> dict:
+    new_product.id = None  # id назначает база данных
     if session.exec(select(Product).where(Product.sku == new_product.sku)).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail="Product with this SKU already exists")
     session.add(new_product)
     session.commit()
     session.refresh(new_product)
-    return {"message": "Product created successfully", "id": str(new_product.id)}
+    return {"message": "Product created successfully", "id": new_product.id}
 
 
 @product_router.get("/", response_model=List[Product])
-async def retrieve_all_products(category_id: Optional[uuid.UUID] = None,
+async def retrieve_all_products(category_id: Optional[int] = None,
                                 session: Session = Depends(get_session)):
     statement = select(Product)
     if category_id:
@@ -30,7 +30,7 @@ async def retrieve_all_products(category_id: Optional[uuid.UUID] = None,
 
 
 @product_router.get("/{id}", response_model=Product)
-async def retrieve_product(id: uuid.UUID, session: Session = Depends(get_session)):
+async def retrieve_product(id: int, session: Session = Depends(get_session)):
     product = session.get(Product, id)
     if product:
         return product
@@ -39,7 +39,7 @@ async def retrieve_product(id: uuid.UUID, session: Session = Depends(get_session
 
 
 @product_router.put("/edit/{id}", response_model=Product)
-async def update_product(id: uuid.UUID, new_data: ProductUpdate,
+async def update_product(id: int, new_data: ProductUpdate,
                          session: Session = Depends(get_session)):
     product = session.get(Product, id)
     if product:
@@ -55,7 +55,7 @@ async def update_product(id: uuid.UUID, new_data: ProductUpdate,
 
 
 @product_router.delete("/delete/{id}")
-async def delete_product(id: uuid.UUID, session: Session = Depends(get_session)) -> dict:
+async def delete_product(id: int, session: Session = Depends(get_session)) -> dict:
     product = session.get(Product, id)
     if product:
         session.delete(product)
