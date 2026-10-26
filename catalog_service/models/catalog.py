@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import SQLModel, Field
 
@@ -31,7 +31,7 @@ class Product(SQLModel, table=True):
     base_price: float = 0
     min_qty: int = 1
     status: str = "active"  # active / discontinued
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # Схема для обновления (не таблица): все поля необязательные

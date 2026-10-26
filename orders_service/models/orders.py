@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlmodel import SQLModel, Field
 
@@ -9,7 +9,7 @@ class Order(SQLModel, table=True):
     client_id: int                            # ссылка на clients (без FK)
     number: str = Field(unique=True, max_length=30)
     status: str = "pending"                   # pending / confirmed / shipped / cancelled
-    order_date: datetime = Field(default_factory=datetime.utcnow)
+    order_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     delivery_address: str = Field(max_length=500)
     total_amount: float = 0
     currency: str = Field(default="RUB", max_length=3)
@@ -33,7 +33,7 @@ class OrderStatusHistory(SQLModel, table=True):
     order_id: int = Field(foreign_key="orders.id")
     status: str
     changed_by: Optional[int] = None          # ссылка на пользователя (без FK)
-    changed_at: datetime = Field(default_factory=datetime.utcnow)
+    changed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # Схемы запросов (не таблицы)

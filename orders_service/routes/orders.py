@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -43,7 +43,7 @@ async def create_order(data: OrderCreate,
 
     # 2. Создаём заказ и позиции в своей БД
     order = Order(client_id=data.client_id,
-                  number=f"ORD-{datetime.utcnow():%Y%m%d%H%M%S%f}",
+                  number=f"ORD-{datetime.now(timezone.utc):%Y%m%d%H%M%S%f}",
                   delivery_address=data.delivery_address,
                   comment=data.comment)
     session.add(order)
