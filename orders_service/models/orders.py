@@ -1,0 +1,56 @@
+import uuid
+from datetime import datetime
+from typing import List, Optional
+from sqlmodel import SQLModel, Field
+
+
+class Order(SQLModel, table=True):
+    __tablename__ = "orders"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    client_id: uuid.UUID                      # ссылка на clients (без FK)
+    number: str = Field(unique=True, max_length=30)
+    status: str = "pending"                   # pending / confirmed / shipped / cancelled
+    order_date: datetime = Field(default_factory=datetime.utcnow)
+    delivery_address: str = Field(max_length=500)
+    total_amount: float = 0
+    currency: str = Field(default="RUB", max_length=3)
+    comment: Optional[str] = None
+
+
+class OrderItem(SQLModel, table=True):
+    __tablename__ = "order_items"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    order_id: uuid.UUID = Field(foreign_key="orders.id")
+    product_id: uuid.UUID                     # ссылка на catalog.products (без FK)
+    qty: float
+    price: float                              # цена на момент заказа
+    discount: float = 0
+    total: float
+
+
+class OrderStatusHistory(SQLModel, table=True):
+    __tablename__ = "order_status_history"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    order_id: uuid.UUID = Field(foreign_key="orders.id")
+    status: str
+    changed_by: Optional[uuid.UUID] = None    # ссылка на пользователя (без FK)
+    changed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Схемы запросов (не таблицы)
+class OrderItemIn(SQLModel):
+    product_id: uuid.UUID
+    qty: float
+
+
+class OrderCreate(SQLModel):
+    client_id: uuid.UUID
+    delivery_address: str
+    comment: Optional[str] = None
+    items: List[OrderItemIn]
+
+
+class OrderUpdate(SQLModel):
+    status: Optional[str] = None
+    delivery_address: Optional[str] = None
+    comment: Optional[str] = None
