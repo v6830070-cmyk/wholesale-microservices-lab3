@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 from typing import List
 import httpx
@@ -44,10 +43,11 @@ async def create_order(data: OrderCreate,
 
     # 2. Создаём заказ и позиции в своей БД
     order = Order(client_id=data.client_id,
-                  number=f"ORD-{datetime.utcnow():%Y%m%d%H%M%S}",
+                  number=f"ORD-{datetime.utcnow():%Y%m%d%H%M%S%f}",
                   delivery_address=data.delivery_address,
                   comment=data.comment)
     session.add(order)
+    session.flush()  # получаем order.id от базы данных
     total = 0.0
     for item, price in lines:
         line_total = round(price * item.qty, 2)
@@ -59,7 +59,7 @@ async def create_order(data: OrderCreate,
     session.commit()
     session.refresh(order)
     return {"message": "Order created successfully",
-            "id": str(order.id), "number": order.number,
+            "id": order.id, "number": order.number,
             "total_amount": order.total_amount}
 
 
@@ -69,7 +69,7 @@ async def retrieve_all_orders(session: Session = Depends(get_session)):
 
 
 @order_router.get("/{id}")
-async def retrieve_order(id: uuid.UUID, session: Session = Depends(get_session)) -> dict:
+async def retrieve_order(id: int, session: Session = Depends(get_session)) -> dict:
     order = session.get(Order, id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -81,7 +81,7 @@ async def retrieve_order(id: uuid.UUID, session: Session = Depends(get_session))
 
 
 @order_router.put("/edit/{id}", response_model=Order)
-async def update_order(id: uuid.UUID, new_data: OrderUpdate,
+async def update_order(id: int, new_data: OrderUpdate,
                        session: Session = Depends(get_session)):
     order = session.get(Order, id)
     if not order:
@@ -105,7 +105,7 @@ async def update_order(id: uuid.UUID, new_data: OrderUpdate,
 
 
 @order_router.delete("/delete/{id}")
-async def delete_order(id: uuid.UUID, session: Session = Depends(get_session)) -> dict:
+async def delete_order(id: int, session: Session = Depends(get_session)) -> dict:
     order = session.get(Order, id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,

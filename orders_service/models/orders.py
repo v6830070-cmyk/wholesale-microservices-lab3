@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 from typing import List, Optional
 from sqlmodel import SQLModel, Field
@@ -6,8 +5,8 @@ from sqlmodel import SQLModel, Field
 
 class Order(SQLModel, table=True):
     __tablename__ = "orders"
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    client_id: uuid.UUID                      # ссылка на clients (без FK)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    client_id: int                            # ссылка на clients (без FK)
     number: str = Field(unique=True, max_length=30)
     status: str = "pending"                   # pending / confirmed / shipped / cancelled
     order_date: datetime = Field(default_factory=datetime.utcnow)
@@ -19,9 +18,9 @@ class Order(SQLModel, table=True):
 
 class OrderItem(SQLModel, table=True):
     __tablename__ = "order_items"
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    order_id: uuid.UUID = Field(foreign_key="orders.id")
-    product_id: uuid.UUID                     # ссылка на catalog.products (без FK)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    order_id: int = Field(foreign_key="orders.id")
+    product_id: int                           # ссылка на catalog.products (без FK)
     qty: float
     price: float                              # цена на момент заказа
     discount: float = 0
@@ -30,21 +29,21 @@ class OrderItem(SQLModel, table=True):
 
 class OrderStatusHistory(SQLModel, table=True):
     __tablename__ = "order_status_history"
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    order_id: uuid.UUID = Field(foreign_key="orders.id")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    order_id: int = Field(foreign_key="orders.id")
     status: str
-    changed_by: Optional[uuid.UUID] = None    # ссылка на пользователя (без FK)
+    changed_by: Optional[int] = None          # ссылка на пользователя (без FK)
     changed_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # Схемы запросов (не таблицы)
 class OrderItemIn(SQLModel):
-    product_id: uuid.UUID
+    product_id: int
     qty: float
 
 
 class OrderCreate(SQLModel):
-    client_id: uuid.UUID
+    client_id: int
     delivery_address: str
     comment: Optional[str] = None
     items: List[OrderItemIn]
