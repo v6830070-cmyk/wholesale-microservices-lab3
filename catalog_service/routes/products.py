@@ -1,13 +1,19 @@
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
+
 from database.connection import get_session
 from models.catalog import Product, ProductUpdate
+from security import get_current_user, require_roles
 
 product_router = APIRouter(tags=["Products"])
 
+manager_or_admin = Depends(require_roles("manager", "admin"))
 
-@product_router.post("/new", status_code=status.HTTP_201_CREATED)
+
+@product_router.post("/new", status_code=status.HTTP_201_CREATED,
+                     dependencies=[manager_or_admin])
 async def create_product(new_product: Product,
                          session: Session = Depends(get_session)) -> dict:
     new_product.id = None  # id назначает база данных
@@ -20,7 +26,8 @@ async def create_product(new_product: Product,
     return {"message": "Product created successfully", "id": new_product.id}
 
 
-@product_router.get("/", response_model=List[Product])
+@product_router.get("/", response_model=List[Product],
+                    dependencies=[Depends(get_current_user)])
 async def retrieve_all_products(category_id: Optional[int] = None,
                                 session: Session = Depends(get_session)):
     statement = select(Product)
@@ -29,7 +36,8 @@ async def retrieve_all_products(category_id: Optional[int] = None,
     return session.exec(statement).all()
 
 
-@product_router.get("/{id}", response_model=Product)
+@product_router.get("/{id}", response_model=Product,
+                    dependencies=[Depends(get_current_user)])
 async def retrieve_product(id: int, session: Session = Depends(get_session)):
     product = session.get(Product, id)
     if product:
@@ -38,7 +46,8 @@ async def retrieve_product(id: int, session: Session = Depends(get_session)):
                         detail="Product with supplied ID does not exist")
 
 
-@product_router.put("/edit/{id}", response_model=Product)
+@product_router.put("/edit/{id}", response_model=Product,
+                    dependencies=[manager_or_admin])
 async def update_product(id: int, new_data: ProductUpdate,
                          session: Session = Depends(get_session)):
     product = session.get(Product, id)
@@ -54,7 +63,7 @@ async def update_product(id: int, new_data: ProductUpdate,
                         detail="Product with supplied ID does not exist")
 
 
-@product_router.delete("/delete/{id}")
+@product_router.delete("/delete/{id}", dependencies=[manager_or_admin])
 async def delete_product(id: int, session: Session = Depends(get_session)) -> dict:
     product = session.get(Product, id)
     if product:

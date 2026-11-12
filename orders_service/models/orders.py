@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 from typing import List, Optional
+
 from sqlmodel import SQLModel, Field
 
 
 class Order(SQLModel, table=True):
     __tablename__ = "orders"
     id: Optional[int] = Field(default=None, primary_key=True)
-    client_id: int                            # ссылка на clients (без FK)
+    client_id: int                            # ссылка на пользователя IAM (без FK)
     number: str = Field(unique=True, max_length=30)
     status: str = "pending"                   # pending / confirmed / shipped / cancelled
     order_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -43,7 +44,8 @@ class OrderItemIn(SQLModel):
 
 
 class OrderCreate(SQLModel):
-    client_id: int
+    # Для клиента игнорируется (берётся из токена); для менеджера и администратора обязателен
+    client_id: Optional[int] = None
     delivery_address: str
     comment: Optional[str] = None
     items: List[OrderItemIn]
