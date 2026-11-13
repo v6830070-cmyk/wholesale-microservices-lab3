@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Отчёты{% endblock %}
+{% block content %}
+<h1>Отчёт по продажам</h1>
+
+<div class="card">
+  <form method="post" action="/reporting/run">
+    <div class="row">
+      <div><label>Период с</label><input name="date_from" type="date" value="{{ form.date_from }}" required></div>
+      <div><label>по</label><input name="date_to" type="date" value="{{ form.date_to }}" required></div>
+      <div><label>Группировка</label>
+        <select name="group_by">{% for g in ["month","product","client"] %}<option value="{{ g }}" {% if form.group_by == g %}selected{% endif %}>{{ g|group_ru }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="row">
+      <div><label>Название (для сохранения)</label><input name="name"></div>
+      <div><label><input type="checkbox" name="save"> Сохранить параметры отчёта</label></div>
+    </div>
+    <p><button type="submit">Построить отчёт</button></p>
+  </form>
+  {% if has(user, "manager", "director") %}
+  <form method="post" action="/reporting/sync">
+    <button class="sec" type="submit">Обновить данные из заказов</button>
+    <span class="muted">Перед первым отчётом загрузите подтверждённые и отгруженные заказы.</span>
+  </form>
+  {% endif %}
+</div>
+
+{% if result %}
+<div class="card">
+  <h2>Продажи {{ result.group_by|group_ru }}, {{ result.date_from }} — {{ result.date_to }}</h2>
+  <table>
+    <tr><th>{% if result.group_by == "month" %}Месяц{% elif result.group_by == "product" %}Товар (ID){% else %}Клиент (ID){% endif %}</th>
+      <th class="num">Заказов</th><th class="num">Кол-во</th><th class="num">Выручка, ₽</th><th class="num">Себестоимость, ₽</th><th class="num">Маржа, ₽</th><th class="num">Маржа, %</th></tr>
+    {% for r in result.rows %}
+    <tr><td>{{ r.key }}</td><td class="num">{{ r.orders }}</td><td class="num">{{ r.qty }}</td><td class="num">{{ r.revenue|money }}</td><td class="num">{{ r.cost|money }}</td><td class="num">{{ r.margin|money }}</td><td class="num">{{ r.margin_pct }}</td></tr>
+    {% endfor %}
+    <tr><th>Итого</th><th class="num">{{ result.totals.orders }}</th><th class="num">{{ result.totals.qty }}</th><th class="num">{{ result.totals.revenue|money }}</th><th class="num">{{ result.totals.cost|money }}</th><th class="num">{{ result.totals.margin|money }}</th><th class="num">{{ result.totals.margin_pct }}</th></tr>
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Сохранённые отчёты</h2>
+  <table>
+    <tr><th>Название</th><th>Параметры</th><th>Создан</th><th></th></tr>
+    {% for s in saved %}
+    <tr><td>{{ s.name }}</td>
+      <td>{{ s.parameters.date_from }} — {{ s.parameters.date_to }}, {{ s.parameters.group_by|group_ru }}</td><td>{{ s.created_at|dt }}</td>
+      <td>
+        <form class="inline" method="post" action="/reporting/saved/{{ s.id }}/run"><button type="submit">Запустить</button></form>
+        {% if has(user, "director") %}<form class="inline" method="post" action="/reporting/saved/{{ s.id }}/delete"><button class="sec" type="submit">Удалить</button></form>{% endif %}
+      </td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Сохранённых отчётов нет</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

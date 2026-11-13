@@ -7,6 +7,7 @@ import uvicorn
 from sqlmodel import Session, select
 
 from database.connection import conn, engine_url
+from docs_ru import setup_docs_ru
 from models.iam import User
 from routes.auth import auth_router
 from routes.users import users_router
@@ -38,17 +39,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="IAM service",
-    description="Лабораторная работа №3. Автор: Игнатченко Владислав",
+    title="Сервис IAM",
     contact={"name": "Игнатченко Владислав", "email": "vlad@example.com"},
     lifespan=lifespan,
+    docs_url=None,
 )
+setup_docs_ru(app)
 
 app.include_router(auth_router, prefix="/auth")
 app.include_router(users_router, prefix="/users")
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def home():
     return RedirectResponse(url="/docs")
 

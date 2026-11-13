@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Ошибка{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Не удалось выполнить запрос</h1>
+  <p class="flash err">{{ detail }}{% if status %} (код {{ status }}){% endif %}</p>
+  {% if status == 403 %}<p class="muted">У вашей роли нет доступа к этому разделу.</p>{% endif %}
+  <p><a class="btn sec" href="javascript:history.back()">Назад</a> <a class="btn" href="/">На главную</a></p>
+</div>
+{% endblock %}

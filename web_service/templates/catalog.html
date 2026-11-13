@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Каталог{% endblock %}
+{% block content %}
+<h1>Каталог товаров</h1>
+<div class="card">
+<table>
+  <tr><th>ID</th><th>Артикул</th><th>Название</th><th class="num">Цена, ₽</th><th class="num">Мин. партия</th><th class="num">В наличии</th><th></th></tr>
+  {% for p in items %}
+  <tr>
+    <td>{{ p.id }}</td><td>{{ p.sku }}</td><td>{{ p.name }}</td>
+    <td class="num">{{ p.base_price|money }}</td>
+    <td class="num">{{ p.min_qty }}</td>
+    <td class="num">{{ available.get(p.id, 0) }}</td>
+    <td>{% if has(user, "client", "manager") %}<a class="btn" href="/orders/new?product_id={{ p.id }}">Заказать</a>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="muted">В каталоге пока нет товаров</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Заказ {{ o.number }}{% endblock %}
+{% block content %}
+<h1>Заказ {{ o.number or o.id }} <span class="badge {{ o.status }}">{{ o.status|st }}</span></h1>
+<div class="card">
+  <dl class="kv">
+    <dt>Клиент (ID)</dt><dd>{{ o.client_id }}</dd>
+    <dt>Дата</dt><dd>{{ o.order_date|dt }}</dd>
+    <dt>Адрес доставки</dt><dd>{{ o.delivery_address or "—" }}</dd>
+    <dt>Комментарий</dt><dd>{{ o.comment or "—" }}</dd>
+    <dt>Итого</dt><dd><b>{{ o.total_amount|money }} {{ o.currency }}</b></dd>
+  </dl>
+</div>
+<div class="card">
+  <h2>Позиции</h2>
+  <table>
+    <tr><th>Товар</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr>
+    {% for it in o["items"] %}
+    <tr><td>{{ names.get(it.product_id, "Товар " ~ it.product_id) }}</td><td class="num">{{ it.qty }}</td><td class="num">{{ it.price|money }}</td><td class="num">{{ it.total|money }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Действия</h2>
+  <div class="row">
+    {% if o.status == "pending" and has(user, "manager") %}
+      <form class="inline" method="post" action="/orders/{{ o.id }}/action"><input type="hidden" name="action" value="confirm"><button type="submit">Подтвердить</button></form>
+    {% endif %}
+    {% if o.status == "confirmed" and has(user, "manager") %}
+      <form class="inline" method="post" action="/orders/{{ o.id }}/action"><input type="hidden" name="action" value="pending"><button class="sec" type="submit">Вернуть в ожидание</button></form>
+    {% endif %}
+    {% if o.status == "confirmed" and has(user, "storekeeper") %}
+      <form class="inline" method="post" action="/orders/{{ o.id }}/action"><input type="hidden" name="action" value="ship"><button type="submit">Отгрузить со склада</button></form>
+    {% endif %}
+    {% if o.status in ["pending", "confirmed"] and (has(user, "manager") or o.client_id == user.id) %}
+      <form class="inline" method="post" action="/orders/{{ o.id }}/action"><input type="hidden" name="action" value="cancel"><button class="danger" type="submit">Отменить заказ</button></form>
+    {% endif %}
+    {% if has(user, "admin") %}
+      <form class="inline" method="post" action="/orders/{{ o.id }}/action"><input type="hidden" name="action" value="delete"><button class="danger" type="submit">Удалить</button></form>
+    {% endif %}
+  </div>
+  {% if o.status == "pending" and has(user, "client") and not has(user, "manager") %}<p class="muted">Заказ ожидает подтверждения менеджером.</p>{% endif %}
+</div>
+
+{% if has(user, "manager") and o.status in ["pending", "confirmed"] %}
+<div class="card">
+  <h2>Изменить данные заказа</h2>
+  <form method="post" action="/orders/{{ o.id }}/action">
+    <input type="hidden" name="action" value="update">
+    <label>Адрес доставки</label><input name="delivery_address" value="{{ o.delivery_address or '' }}">
+    <label>Комментарий</label><input name="comment" value="{{ o.comment or '' }}">
+    <p><button type="submit">Сохранить</button></p>
+  </form>
+</div>
+{% endif %}
+
+{% if has(user, "accountant") and o.status in ["confirmed", "shipped"] and not invoices %}
+<div class="card">
+  <h2>Выставить счёт</h2>
+  <form method="post" action="/orders/{{ o.id }}/action" class="row">
+    <input type="hidden" name="action" value="invoice">
+    <div><label>НДС, %</label><input name="vat_rate" type="number" step="0.01" value="20"></div>
+    <div><label>Срок оплаты, дней</label><input name="due_days" type="number" value="14"></div>
+    <div><button type="submit">Выставить счёт</button></div>
+  </form>
+</div>
+{% endif %}
+
+{% if invoices %}
+<div class="card">
+  <h2>Счета по заказу</h2>
+  <table>
+    <tr><th>Номер</th><th>Статус</th><th class="num">Итого</th><th class="num">Оплачено</th><th></th></tr>
+    {% for inv in invoices %}
+    <tr><td>{{ inv.number }}</td><td><span class="badge {{ inv.status }}">{{ inv.status|st }}</span></td><td class="num">{{ inv.total|money }}</td><td class="num">{{ inv.paid_amount|money }}</td><td><a class="btn sec" href="/finance/invoices/{{ inv.id }}">Открыть</a></td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if shipments %}
+<div class="card">
+  <h2>Отгрузки (накладные)</h2>
+  <table>
+    <tr><th>Накладная</th><th>Дата</th><th>Позиции</th></tr>
+    {% for s in shipments %}
+    <tr><td>{{ s.shipment.number }}</td><td>{{ s.shipment.shipped_at|dt }}</td>
+      <td>{% for it in s["items"] %}{{ names.get(it.product_id, "Товар " ~ it.product_id) }} × {{ it.qty }} (склад {{ it.warehouse_id }}){% if not loop.last %}; {% endif %}{% endfor %}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>История статусов</h2>
+  <table>
+    <tr><th>Дата</th><th>Статус</th><th>Кем изменён (ID)</th></tr>
+    {% for h in o.history %}
+    <tr><td>{{ h.changed_at|dt }}</td><td>{{ h.status|st }}</td><td>{{ h.changed_by }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+<p><a class="btn sec" href="/orders">← К списку заказов</a></p>
+{% endblock %}

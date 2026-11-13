@@ -17,7 +17,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", "wholesale-lab3-dev-secret-key-change-me-01
 JWT_ALGORITHM = "HS256"
 TOKEN_TTL_MINUTES = 60
 PBKDF2_ITERATIONS = 200_000
-ROLES = {"client", "manager", "admin"}
+ROLES = {"client", "manager", "admin", "storekeeper", "accountant", "director"}
 
 bearer_scheme = HTTPBearer(auto_error=False)
 

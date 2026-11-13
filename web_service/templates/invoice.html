@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Счёт {{ inv.number }}{% endblock %}
+{% block content %}
+<h1>Счёт {{ inv.number }} <span class="badge {{ inv.status }}">{{ inv.status|st }}</span></h1>
+<div class="card">
+  <dl class="kv">
+    <dt>Заказ</dt><dd><a href="/orders/{{ inv.order_id }}">№{{ inv.order_id }}</a></dd>
+    <dt>Плательщик</dt><dd>{{ inv.client_name or "—" }}, ИНН {{ inv.client_inn or "—" }}{% if inv.client_kpp %}, КПП {{ inv.client_kpp }}{% endif %}</dd>
+    <dt>Адрес</dt><dd>{{ inv.client_address or "—" }}</dd>
+    <dt>Дата выставления</dt><dd>{{ inv.issue_date }}</dd>
+    <dt>Оплатить до</dt><dd>{{ inv.due_date }}</dd>
+    <dt>Сумма без НДС</dt><dd>{{ inv.amount_net|money }} ₽</dd>
+    <dt>НДС {{ inv.vat_rate }}%</dt><dd>{{ inv.vat_amount|money }} ₽</dd>
+    <dt>Итого к оплате</dt><dd><b>{{ inv.total|money }} ₽</b></dd>
+    <dt>Оплачено</dt><dd>{{ inv.paid_amount|money }} ₽ (осталось {{ inv.due|money }} ₽)</dd>
+  </dl>
+</div>
+<div class="card">
+  <h2>Позиции</h2>
+  <table>
+    <tr><th>Наименование</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr>
+    {% for it in inv["items"] %}<tr><td>{{ it.name }}</td><td class="num">{{ it.qty }}</td><td class="num">{{ it.price|money }}</td><td class="num">{{ it.total|money }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% if has(user, "accountant") %}
+<div class="card">
+  <h2>Действия</h2>
+  <div class="row">
+    {% if inv.status == "issued" %}
+    <form class="inline" method="post" action="/finance/invoices/{{ inv.id }}/action"><input type="hidden" name="action" value="send"><button type="submit">Отправить клиенту</button></form>
+    {% endif %}
+    {% if inv.status in ["issued", "sent"] and not inv.paid_amount %}
+    <form class="inline" method="post" action="/finance/invoices/{{ inv.id }}/action"><input type="hidden" name="action" value="cancel"><button class="danger" type="submit">Отменить счёт</button></form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+<p><a class="btn sec" href="/finance">← К финансам</a></p>
+{% endblock %}

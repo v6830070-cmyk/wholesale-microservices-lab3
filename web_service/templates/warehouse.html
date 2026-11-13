@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Склад{% endblock %}
+{% block content %}
+<h1>Склад</h1>
+<div class="card">
+  <form method="get" action="/warehouse" class="row">
+    <div><label>Товар</label>
+      <select name="product_id"><option value="">Все</option>
+        {% for p in products %}<option value="{{ p.id }}" {% if product_id == (p.id|string) %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+      </select></div>
+    {% if warehouses %}
+    <div><label>Склад</label>
+      <select name="warehouse_id"><option value="">Все</option>
+        {% for w in warehouses %}<option value="{{ w.id }}" {% if warehouse_id == (w.id|string) %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+      </select></div>
+    {% endif %}
+    <div><button class="sec" type="submit">Показать остатки</button></div>
+  </form>
+</div>
+
+<div class="card">
+<h2>Остатки</h2>
+<table>
+  {% if has(user, "storekeeper", "manager", "director", "accountant") %}
+  <tr><th>Склад</th><th>Товар</th><th class="num">На складе</th><th class="num">В резерве</th><th class="num">Доступно</th><th class="num">Мин. остаток</th></tr>
+  {% for s in stock %}
+  <tr><td>{{ wnames.get(s.warehouse_id, s.warehouse_id) }}</td><td>{{ names.get(s.product_id, s.product_id) }}</td>
+    <td class="num">{{ s.qty }}</td><td class="num">{{ s.reserved_qty }}</td>
+    <td class="num">{{ s.available }}{% if s.below_min %} <span class="badge blocked">ниже минимума</span>{% endif %}</td>
+    <td class="num">{{ s.min_qty }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Данных об остатках нет</td></tr>{% endfor %}
+  {% else %}
+  <tr><th>Товар</th><th class="num">Доступно</th></tr>
+  {% for s in stock %}<tr><td>{{ names.get(s.product_id, s.product_id) }}</td><td class="num">{{ s.available }}</td></tr>
+  {% else %}<tr><td colspan="2" class="muted">Данных об остатках нет</td></tr>{% endfor %}
+  {% endif %}
+</table>
+</div>
+
+{% if has(user, "storekeeper") %}
+<div class="grid">
+  <div class="card">
+    <h2>Новый склад</h2>
+    <form method="post" action="/warehouse/action"><input type="hidden" name="action" value="create">
+      <label>Название *</label><input name="name" required>
+      <label>Адрес</label><input name="address">
+      <p><button type="submit">Создать склад</button></p></form>
+  </div>
+  <div class="card">
+    <h2>Приёмка товара</h2>
+    <form method="post" action="/warehouse/action"><input type="hidden" name="action" value="receipt">
+      {% include "_wh_pick.html" %}
+      <label>Количество *</label><input name="qty" type="number" min="1" required>
+      <label>Мин. остаток (необязательно)</label><input name="min_qty" type="number" min="0">
+      <p><button type="submit">Принять</button></p></form>
+  </div>
+  <div class="card">
+    <h2>Списание (брак, потери)</h2>
+    <form method="post" action="/warehouse/action"><input type="hidden" name="action" value="writeoff">
+      {% include "_wh_pick.html" %}
+      <label>Количество *</label><input name="qty" type="number" min="1" required>
+      <label>Причина *</label><input name="reason" required>
+      <p><button class="danger" type="submit">Списать</button></p></form>
+  </div>
+  <div class="card">
+    <h2>Инвентаризация</h2>
+    <form method="post" action="/warehouse/action"><input type="hidden" name="action" value="adjust">
+      {% include "_wh_pick.html" %}
+      <label>Фактическое количество *</label><input name="new_qty" type="number" min="0" required>
+      <label>Основание *</label><input name="reason" required>
+      <p><button type="submit">Скорректировать</button></p></form>
+  </div>
+</div>
+{% endif %}
+
+{% if movements %}
+<div class="card">
+<h2>Последние движения</h2>
+<table>
+  <tr><th>Дата</th><th>Тип</th><th>Склад</th><th>Товар</th><th class="num">Кол-во</th><th>Документ</th><th>Комментарий</th></tr>
+  {% for m in movements %}
+  <tr><td>{{ m.created_at|dt }}</td>
+    <td>{{ {"receipt":"Приёмка","shipment":"Отгрузка","writeoff":"Списание","adjustment":"Инвентаризация"}.get(m.type, m.type) }}</td>
+    <td>{{ wnames.get(m.warehouse_id, m.warehouse_id) }}</td><td>{{ names.get(m.product_id, m.product_id) }}</td>
+    <td class="num">{{ m.qty }}</td><td>{{ m.document_type or "—" }}{% if m.document_id %} №{{ m.document_id }}{% endif %}</td><td>{{ m.comment or "" }}</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+{% endblock %}

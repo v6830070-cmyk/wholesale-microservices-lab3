@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Вход</h1>
+  <form method="post" action="/login">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" value="{{ email or '' }}" required autofocus>
+    <label for="password">Пароль</label>
+    <input id="password" name="password" type="password" required>
+    <p><button type="submit">Войти</button> <a class="btn sec" href="/register">Регистрация</a></p>
+  </form>
+</div>
+{% endblock %}

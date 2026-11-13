@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Пользователи{% endblock %}
+{% block content %}
+<h1>Пользователи и роли</h1>
+<div class="card">
+<table>
+  <tr><th>ID</th><th>Email</th><th>Роль</th><th>Назначить роль</th></tr>
+  {% for u in users %}
+  <tr><td>{{ u.id }}</td><td>{{ u.email }}</td><td>{{ u.role|role_ru }}</td>
+    <td>
+      <form class="inline" method="post" action="/users/role">
+        <input type="hidden" name="user_id" value="{{ u.id }}">
+        <select name="role" style="width:auto">{% for r in ALL_ROLES %}<option value="{{ r }}" {% if u.role == r %}selected{% endif %}>{{ r|role_ru }}</option>{% endfor %}</select>
+        <button class="sec" type="submit">Сохранить</button>
+      </form>
+    </td></tr>
+  {% endfor %}
+</table>
+<p class="muted">После смены роли пользователь должен выйти и войти заново: роль хранится в токене.</p>
+</div>
+{% endblock %}

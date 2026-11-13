@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Финансы{% endblock %}
+{% block content %}
+<h1>Финансы</h1>
+
+<div class="card">
+  <h2>Баланс клиента</h2>
+  {% if has(user, "accountant", "manager", "director") %}
+  <form method="get" action="/finance" class="row">
+    <div><label>Клиент</label>
+      <select name="client_id"><option value="">— выберите —</option>
+        {% for c in options %}<option value="{{ c.user_id }}" {% if client_id == (c.user_id|string) %}selected{% endif %}>{{ c.name }} (ID {{ c.user_id }})</option>{% endfor %}
+      </select></div>
+    <div><button class="sec" type="submit">Показать</button></div>
+  </form>
+  {% endif %}
+  {% if balance %}
+  <dl class="kv" style="margin-top:12px">
+    <dt>Выставлено счетов</dt><dd>{{ balance.invoiced_total|money }} ₽</dd>
+    <dt>Оплачено</dt><dd>{{ balance.paid_total|money }} ₽</dd>
+    <dt>Задолженность</dt><dd><b>{{ balance.debt|money }} ₽</b></dd>
+    <dt>Аванс (нераспределённо)</dt><dd><b>{{ balance.advance|money }} ₽</b></dd>
+    <dt>Открытые счета</dt><dd>{{ balance.open_invoices|join(", ") or "—" }}</dd>
+  </dl>
+  {% elif not has(user, "accountant", "manager", "director") %}
+  <p class="muted">Данных по балансу пока нет.</p>
+  {% endif %}
+</div>
+
+{% if has(user, "accountant") %}
+<div class="card">
+  <h2>Внести платёж</h2>
+  <form method="post" action="/finance/payment">
+    <div class="row">
+      <div><label>Клиент *</label>
+        <select name="client_id" required>
+          {% for c in options %}<option value="{{ c.user_id }}" {% if client_id == (c.user_id|string) %}selected{% endif %}>{{ c.name }} (ID {{ c.user_id }})</option>{% endfor %}
+        </select></div>
+      <div><label>Сумма, ₽ *</label><input name="amount" type="number" step="0.01" min="0.01" required></div>
+      <div><label>Дата платежа</label><input name="payment_date" type="date" max="{{ today }}" value="{{ today }}"></div>
+    </div>
+    <div class="row">
+      <div><label>Способ оплаты</label>
+        <select name="method">{% for m in ["bank_transfer","cash","card"] %}<option value="{{ m }}">{{ m|method_ru }}</option>{% endfor %}</select></div>
+      <div><label>Номер платёжного документа</label><input name="external_doc_number"></div>
+    </div>
+    <p class="muted">Платёж автоматически распределяется по неоплаченным счетам клиента; излишек остаётся авансом.</p>
+    <p><button type="submit">Внести платёж</button></p>
+  </form>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Счета</h2>
+  <form method="get" action="/finance" class="row">
+    <div><label>Статус</label>
+      <select name="status"><option value="">Все</option>
+        {% for s in ["issued","sent","partially_paid","paid","cancelled"] %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s|st }}</option>{% endfor %}
+      </select></div>
+    <div><button class="sec" type="submit">Показать</button></div>
+  </form>
+  <table style="margin-top:10px">
+    <tr><th>Номер</th><th>Заказ</th><th>Клиент</th><th>Срок оплаты</th><th>Статус</th><th class="num">Итого, ₽</th><th class="num">Оплачено, ₽</th><th></th></tr>
+    {% for inv in invoices %}
+    <tr><td>{{ inv.number }}</td><td><a href="/orders/{{ inv.order_id }}">№{{ inv.order_id }}</a></td><td>{{ inv.client_name or inv.client_id }}</td><td>{{ inv.due_date }}</td>
+      <td><span class="badge {{ inv.status }}">{{ inv.status|st }}</span></td>
+      <td class="num">{{ inv.total|money }}</td><td class="num">{{ inv.paid_amount|money }}</td>
+      <td><a class="btn sec" href="/finance/invoices/{{ inv.id }}">Открыть</a></td></tr>
+    {% else %}<tr><td colspan="8" class="muted">Счетов нет</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Платежи</h2>
+  <table>
+    <tr><th>№</th><th>Дата</th><th>Клиент (ID)</th><th>Способ</th><th>Документ</th><th class="num">Сумма, ₽</th><th class="num">Распределено, ₽</th></tr>
+    {% for p in payments %}
+    <tr><td>{{ p.id }}</td><td>{{ p.payment_date }}</td><td>{{ cnames.get(p.client_id, p.client_id) }}</td><td>{{ p.method|method_ru }}</td><td>{{ p.external_doc_number or "—" }}</td>
+      <td class="num">{{ p.amount|money }}</td><td class="num">{{ p.allocated_amount|money }}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">Платежей нет</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

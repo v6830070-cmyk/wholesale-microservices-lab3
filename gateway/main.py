@@ -1,6 +1,9 @@
+"""API Gateway: единая точка входа, проверка JWT, ограничение частоты, маршрутизация по префиксу."""
+import asyncio
 import os
 import time
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 
 import httpx
 import jwt
@@ -8,118 +11,105 @@ import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
-JWT_SECRET = os.getenv("JWT_SECRET", "wholesale-lab3-dev-secret-key-change-me-0123456789")
-JWT_ALGORITHM = "HS256"
+from security import ALGORITHM, SECRET_KEY
 
-# Адреса сервисов: первая часть пути запроса выбирает сервис
 SERVICES = {
-    "iam": "http://127.0.0.1:8003",
-    "catalog": "http://127.0.0.1:8001",
-    "orders": "http://127.0.0.1:8002",
+    "iam": os.getenv("IAM_URL", "http://127.0.0.1:8003"),
+    "catalog": os.getenv("CATALOG_URL", "http://127.0.0.1:8001"),
+    "orders": os.getenv("ORDERS_URL", "http://127.0.0.1:8002"),
+    "clients": os.getenv("CLIENTS_URL", "http://127.0.0.1:8004"),
+    "warehouse": os.getenv("WAREHOUSE_URL", "http://127.0.0.1:8005"),
+    "finance": os.getenv("FINANCE_URL", "http://127.0.0.1:8006"),
+    "reporting": os.getenv("REPORTING_URL", "http://127.0.0.1:8007"),
 }
 
-# Маршруты, доступные без токена: (метод, путь без начального и конечного "/")
-PUBLIC_ROUTES = {
-    ("POST", "iam/auth/register"),
-    ("POST", "iam/auth/login"),
-}
+# Публичные маршруты IAM: регистрация и вход (окончание пути).
+PUBLIC_SUFFIXES = ("register", "login")
 
-# Ограничение нагрузки: не более RATE_LIMIT запросов за RATE_WINDOW секунд с одного IP
-RATE_LIMIT = 120
-RATE_WINDOW = 60
-hits = defaultdict(deque)
+RATE_LIMIT = int(os.getenv("RATE_LIMIT", "120"))
+RATE_WINDOW = int(os.getenv("RATE_WINDOW", "60"))
+_hits: "defaultdict[str, deque]" = defaultdict(deque)
 
-# Заголовки, которые не пересылаются на сервис
-SKIPPED_HEADERS = {"host", "content-length", "connection", "keep-alive",
-                   "transfer-encoding", "accept-encoding"}
-
-app = FastAPI(
-    title="API Gateway",
-    description="Лабораторная работа №3. Автор: Игнатченко Владислав",
-    contact={"name": "Игнатченко Владислав", "email": "vlad@example.com"},
-)
+HOP_HEADERS = {"host", "content-length", "connection", "transfer-encoding", "keep-alive"}
 
 
-def is_rate_limited(ip: str) -> bool:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.http = httpx.AsyncClient(timeout=30.0, follow_redirects=False)
+    yield
+    await app.state.http.aclose()
+
+
+app = FastAPI(title="Шлюз API", version="2.0.0", lifespan=lifespan)
+
+
+def _rate_limited(key: str) -> bool:
     now = time.monotonic()
-    queue = hits[ip]
-    while queue and now - queue[0] > RATE_WINDOW:
-        queue.popleft()
-    if len(queue) >= RATE_LIMIT:
+    bucket = _hits[key]
+    while bucket and now - bucket[0] > RATE_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= RATE_LIMIT:
         return True
-    queue.append(now)
+    bucket.append(now)
     return False
 
 
-def unauthorized(detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=401,
-                        headers={"WWW-Authenticate": "Bearer"})
-
-
-@app.get("/")
-async def home() -> dict:
-    return {"service": "API Gateway",
-            "routes": {name: f"/{name}/..." for name in SERVICES},
-            "health": "/health"}
-
-
 @app.get("/health")
-async def health() -> dict:
-    result = {}
-    async with httpx.AsyncClient(timeout=3.0) as client:
-        for name, base in SERVICES.items():
-            try:
-                resp = await client.get(f"{base}/openapi.json")
-                result[name] = "up" if resp.status_code == 200 else f"error {resp.status_code}"
-            except httpx.RequestError:
-                result[name] = "down"
-    return result
+async def health(request: Request):
+    client: httpx.AsyncClient = request.app.state.http
+
+    async def probe(name: str, base: str):
+        try:
+            response = await client.get(f"{base}/openapi.json", timeout=3.0)
+            return name, "up" if response.status_code == 200 else f"http {response.status_code}"
+        except httpx.HTTPError:
+            return name, "down"
+
+    results = await asyncio.gather(*(probe(name, base) for name, base in SERVICES.items()))
+    return {"gateway": "ok", "services": dict(results)}
 
 
-@app.api_route("/{service}/{path:path}",
-               methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-               include_in_schema=False)
+@app.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy(service: str, path: str, request: Request):
-    ip = request.client.host if request.client else "unknown"
-    if is_rate_limited(ip):
-        return JSONResponse({"detail": "Too many requests"}, status_code=429)
-
     base = SERVICES.get(service)
     if base is None:
-        return JSONResponse({"detail": f"Unknown service '{service}'"}, status_code=404)
+        return JSONResponse({"detail": f"Неизвестный сервис «{service}»"}, status_code=404)
 
-    route_key = (request.method, f"{service}/{path}".rstrip("/"))
-    if route_key not in PUBLIC_ROUTES:
-        scheme, _, token = request.headers.get("authorization", "").partition(" ")
-        if scheme.lower() != "bearer" or not token:
-            return unauthorized("Not authenticated")
+    is_public = service == "iam" and path.rstrip("/").endswith(PUBLIC_SUFFIXES)
+    rate_key = request.client.host if request.client else "unknown"
+
+    if not is_public:
+        header = request.headers.get("authorization", "")
+        if not header.lower().startswith("bearer "):
+            return JSONResponse({"detail": "Требуется авторизация"}, status_code=401)
+        token = header[7:].strip()
         try:
-            jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         except jwt.ExpiredSignatureError:
-            return unauthorized("Token expired")
-        except jwt.PyJWTError:
-            return unauthorized("Invalid token")
+            return JSONResponse({"detail": "Токен просрочен"}, status_code=401)
+        except jwt.InvalidTokenError:
+            return JSONResponse({"detail": "Недействительный токен"}, status_code=401)
+        rate_key = f"user:{payload.get('sub') or payload.get('user_id') or rate_key}"
+
+    if _rate_limited(rate_key):
+        return JSONResponse({"detail": "Слишком много запросов"}, status_code=429)
 
     url = f"{base}/{path}"
-    if request.url.query:
-        url = f"{url}?{request.url.query}"
-    headers = {key: value for key, value in request.headers.items()
-               if key.lower() not in SKIPPED_HEADERS}
-    headers["X-Forwarded-For"] = ip
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP_HEADERS}
     body = await request.body()
-
+    client: httpx.AsyncClient = request.app.state.http
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            upstream = await client.request(request.method, url,
-                                            content=body, headers=headers)
-    except httpx.RequestError:
-        return JSONResponse({"detail": f"Service '{service}' is unavailable"},
-                            status_code=503)
+        upstream = await client.request(
+            request.method, url, params=request.query_params, headers=headers, content=body
+        )
+    except httpx.HTTPError:
+        return JSONResponse({"detail": f"Сервис «{service}» недоступен"}, status_code=503)
 
-    return Response(content=upstream.content,
-                    status_code=upstream.status_code,
-                    media_type=upstream.headers.get("content-type"))
+    response_headers = {
+        k: v for k, v in upstream.headers.items() if k.lower() in ("content-type", "location", "www-authenticate")
+    }
+    return Response(content=upstream.content, status_code=upstream.status_code, headers=response_headers)
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=int(os.getenv("GATEWAY_PORT", "8000")), reload=True)

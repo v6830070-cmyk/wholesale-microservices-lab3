@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block content %}
+<h1>{{ c.name }} <span class="badge {{ c.status }}">{{ c.status|st }}</span></h1>
+<div class="card">
+  <dl class="kv">
+    <dt>ИНН / КПП</dt><dd>{{ c.inn }} / {{ c.kpp or "—" }}</dd>
+    <dt>Юридический адрес</dt><dd>{{ c.legal_address }}</dd>
+    <dt>Кредитный лимит</dt><dd>{% if c.credit_limit %}{{ c.credit_limit|money }} ₽{% else %}не задан{% endif %}</dd>
+    <dt>Менеджер (ID)</dt><dd>{{ c.manager_id or "—" }}</dd>
+    <dt>Пользователь (ID)</dt><dd>{{ c.user_id or "—" }}</dd>
+    <dt>Создана</dt><dd>{{ c.created_at|dt }}</dd>
+  </dl>
+</div>
+
+{% if has(user, "manager") %}
+<div class="card">
+  <h2>Статус клиента</h2>
+  <div class="row">
+    {% for s in ["new","active","blocked"] %}
+    <form class="inline" method="post" action="/clients/{{ c.id }}/action">
+      <input type="hidden" name="action" value="status"><input type="hidden" name="status" value="{{ s }}">
+      <button type="submit" {% if c.status == s %}disabled{% else %}class="sec"{% endif %}>{{ s|st }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  <p class="muted">Заблокированный клиент не может оформлять заказы.</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Изменить данные</h2>
+  <form method="post" action="/clients/{{ c.id }}/action">
+    <input type="hidden" name="action" value="edit">
+    {% if has(user, "manager") %}
+      <div class="row">
+        <div><label>Название</label><input name="name" placeholder="{{ c.name }}"></div>
+        <div><label>КПП</label><input name="kpp" placeholder="{{ c.kpp or '' }}"></div>
+      </div>
+      <label>Юридический адрес</label><input name="legal_address" placeholder="{{ c.legal_address }}">
+      <div class="row">
+        <div><label>ID менеджера</label><input name="manager_id" type="number" placeholder="{{ c.manager_id or '' }}"></div>
+        <div><label>Кредитный лимит, ₽</label><input name="credit_limit" type="number" step="0.01" min="0" placeholder="{{ c.credit_limit }}"></div>
+      </div>
+      <p class="muted">Пустые поля остаются без изменений.</p>
+    {% else %}
+      <label>Юридический адрес</label><input name="legal_address" value="{{ c.legal_address }}" required>
+    {% endif %}
+    <p><button type="submit">Сохранить</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Контакты</h2>
+  <table>
+    <tr><th>ФИО</th><th>Должность</th><th>Телефон</th><th>Email</th><th></th></tr>
+    {% for k in contacts %}
+    <tr><td>{{ k.full_name }}</td><td>{{ k.position or "—" }}</td><td>{{ k.phone or "—" }}</td><td>{{ k.email or "—" }}</td>
+      <td><form class="inline" method="post" action="/clients/{{ c.id }}/action"><input type="hidden" name="action" value="del_contact"><input type="hidden" name="contact_id" value="{{ k.id }}"><button class="sec" type="submit">Удалить</button></form></td></tr>
+    {% else %}<tr><td colspan="5" class="muted">Контактов пока нет</td></tr>{% endfor %}
+  </table>
+  <form method="post" action="/clients/{{ c.id }}/action">
+    <input type="hidden" name="action" value="add_contact">
+    <div class="row">
+      <div><label>ФИО *</label><input name="full_name" required></div>
+      <div><label>Должность</label><input name="position"></div>
+      <div><label>Телефон</label><input name="phone"></div>
+      <div><label>Email</label><input name="email" type="email"></div>
+    </div>
+    <p><button type="submit">Добавить контакт</button></p>
+  </form>
+</div>
+
+{% if has(user, "admin") %}
+<form method="post" action="/clients/{{ c.id }}/action"><input type="hidden" name="action" value="delete"><button class="danger" type="submit">Удалить карточку</button></form>
+{% endif %}
+{% endblock %}

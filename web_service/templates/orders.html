@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Заказы{% endblock %}
+{% block content %}
+<h1>Заказы</h1>
+<div class="card">
+  <form method="get" action="/orders" class="row">
+    <div><label>Статус</label>
+      <select name="status">
+        <option value="">Все</option>
+        {% for s in ["pending","confirmed","shipped","cancelled"] %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s|st }}</option>{% endfor %}
+      </select></div>
+    <div><button class="sec" type="submit">Показать</button>
+      {% if has(user, "client", "manager") %}<a class="btn" href="/orders/new">Новый заказ</a>{% endif %}</div>
+  </form>
+</div>
+<div class="card">
+<table>
+  <tr><th>Номер</th><th>Дата</th><th>Клиент (ID)</th><th>Статус</th><th class="num">Сумма, ₽</th><th></th></tr>
+  {% for o in orders %}
+  <tr>
+    <td>{{ o.number or o.id }}</td><td>{{ o.order_date|dt }}</td><td>{{ o.client_id }}</td>
+    <td><span class="badge {{ o.status }}">{{ o.status|st }}</span></td>
+    <td class="num">{{ o.total_amount|money }}</td>
+    <td><a class="btn sec" href="/orders/{{ o.id }}">Открыть</a></td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="muted">Заказов нет</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

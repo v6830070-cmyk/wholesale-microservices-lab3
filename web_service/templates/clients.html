@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Клиенты{% endblock %}
+{% block content %}
+<h1>Клиенты</h1>
+<div class="card">
+  <form method="get" action="/clients" class="row">
+    <div><label>Статус</label>
+      <select name="status">
+        <option value="">Все</option>
+        {% for s in ["new","active","blocked"] %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s|st }}</option>{% endfor %}
+      </select></div>
+    <div><button class="sec" type="submit">Показать</button>
+      {% if has(user, "manager") %}<a class="btn" href="/clients/new">Новый клиент</a>{% endif %}</div>
+  </form>
+</div>
+<div class="card">
+<table>
+  <tr><th>ID</th><th>Название</th><th>ИНН</th><th>Статус</th><th class="num">Кредитный лимит, ₽</th><th>Пользователь (ID)</th><th></th></tr>
+  {% for c in clients %}
+  <tr>
+    <td>{{ c.id }}</td><td>{{ c.name }}</td><td>{{ c.inn }}</td>
+    <td><span class="badge {{ c.status }}">{{ c.status|st }}</span></td>
+    <td class="num">{% if c.credit_limit %}{{ c.credit_limit|money }}{% else %}не задан{% endif %}</td>
+    <td>{{ c.user_id or "—" }}</td>
+    <td><a class="btn sec" href="/clients/{{ c.id }}">Открыть</a></td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="muted">Клиентов нет</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

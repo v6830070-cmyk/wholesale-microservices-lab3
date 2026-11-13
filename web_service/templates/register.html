@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Регистрация{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Регистрация</h1>
+  <form method="post" action="/register">
+    {% for f in fields %}
+      <label for="f_{{ f.name }}">{{ labels.get(f.name, f.name) }}{% if f.required %} *{% endif %}</label>
+      <input id="f_{{ f.name }}" name="{{ f.name }}"
+             type="{% if f.name == 'password' %}password{% elif f.name == 'email' %}email{% else %}text{% endif %}"
+             value="{% if f.name != 'password' %}{{ (values or {}).get(f.name, '') }}{% endif %}"
+             {% if f.required %}required{% endif %}>
+    {% endfor %}
+    <p><button type="submit">Зарегистрироваться</button> <a class="btn sec" href="/login">Уже есть аккаунт</a></p>
+  </form>
+</div>
+{% endblock %}

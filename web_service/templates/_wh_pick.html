@@ -1,0 +1,8 @@
+<label>Склад *</label>
+<select name="warehouse_id" required>
+  {% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}
+</select>
+<label>Товар *</label>
+<select name="product_id" required>
+  {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+</select>

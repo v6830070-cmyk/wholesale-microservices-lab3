@@ -1,9 +1,12 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+
 import uvicorn
+from fastapi import FastAPI
+
+import models.orders  # noqa: F401  (регистрирует таблицы)
 from database.connection import conn
-from routes.orders import order_router
+from docs_ru import setup_docs_ru
+from routes.orders import router as orders_router
 
 
 @asynccontextmanager
@@ -12,20 +15,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(
-    title="Orders service",
-    description="Лабораторная работа №2. Автор: Игнатченко Владислав",
-    contact={"name": "Игнатченко Владислав", "email": "vlad@example.com"},
-    lifespan=lifespan,
-)
-
-app.include_router(order_router, prefix="/order")
+app = FastAPI(title="Сервис заказов", version="2.0.0", lifespan=lifespan, docs_url=None)
+setup_docs_ru(app)
+app.include_router(orders_router)
 
 
-@app.get("/")
-async def home():
-    return RedirectResponse(url="/order/")
+@app.get("/health", include_in_schema=False)
+def health():
+    return {"service": "orders", "status": "ok"}
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8002, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8002, reload=True)

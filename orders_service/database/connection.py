@@ -1,17 +1,17 @@
-from sqlmodel import SQLModel, Session, create_engine
-from models.orders import Order, OrderItem, OrderStatusHistory  # noqa: F401
+import os
 
-database_file = "orders.db"
-database_connection_string = f"sqlite:///{database_file}"
-connect_args = {"check_same_thread": False}
-engine_url = create_engine(database_connection_string, echo=True,
-                           connect_args=connect_args)
+from sqlmodel import Session, SQLModel, create_engine
+
+DB_URL = os.getenv("ORDERS_DB_URL", "sqlite:///./orders.db")
+
+engine = create_engine(DB_URL, connect_args={"check_same_thread": False})
 
 
-def conn():
-    SQLModel.metadata.create_all(engine_url)
+def conn() -> None:
+    """Создаёт таблицы (модели должны быть импортированы до вызова)."""
+    SQLModel.metadata.create_all(engine)
 
 
 def get_session():
-    with Session(engine_url) as session:
+    with Session(engine) as session:
         yield session

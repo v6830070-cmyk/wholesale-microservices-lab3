@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Главная{% endblock %}
+{% block content %}
+<h1>Здравствуйте, {{ user.email or ("пользователь " ~ user.id) }}</h1>
+<p class="muted">Ваша роль: <b>{{ user.role|role_ru }}</b></p>
+<div class="grid">
+  <a class="tile" href="/catalog"><b>Каталог</b>Товары, цены и наличие на складе</a>
+  <a class="tile" href="/orders"><b>Заказы</b>Оформление, статусы, отмена{% if has(user, "storekeeper") %}, отгрузка{% endif %}</a>
+  <a class="tile" href="/clients"><b>{% if has(user, "manager", "accountant", "director") %}Клиенты{% else %}Моя карточка{% endif %}</b>Реквизиты, контакты, кредитный лимит</a>
+  <a class="tile" href="/warehouse"><b>Склад</b>Остатки{% if has(user, "storekeeper") %}, приёмка, списание, инвентаризация{% endif %}</a>
+  <a class="tile" href="/finance"><b>Финансы</b>Счета, платежи, баланс</a>
+  {% if has(user, "manager", "director", "accountant") %}<a class="tile" href="/reporting"><b>Отчёты</b>Продажи по клиентам, товарам и месяцам</a>{% endif %}
+  {% if has(user, "admin") %}<a class="tile" href="/users"><b>Пользователи</b>Назначение ролей</a>{% endif %}
+</div>
+{% endblock %}
